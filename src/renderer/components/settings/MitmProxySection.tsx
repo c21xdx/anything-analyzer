@@ -246,7 +246,7 @@ export default function MitmProxySection() {
               fontSize: 'var(--font-size-sm)',
               userSelect: 'all',
             }}>
-              http://cert.anything.local
+              http://cert.anything.test
             </code>
           </div>
         </>

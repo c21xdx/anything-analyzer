@@ -13,7 +13,7 @@ import { v4 as uuidv4 } from "uuid";
 import { SocksClient } from "socks";
 import type { CaManager } from "./ca-manager";
 import type { ProxyConfig } from "../../shared/types";
-import { CERT_DOWNLOAD_HOST, generateCertPage, getCertFileContent } from "./cert-download-page";
+import { generateCertPage, getCertFileContent, isCertDownloadHost } from "./cert-download-page";
 
 const MAX_BODY_SIZE = 1024 * 1024; // 1MB — same limit as CdpManager
 const BINARY_CONTENT_TYPES = [
@@ -390,7 +390,10 @@ export class MitmProxyServer extends EventEmitter {
   ): void {
     // Intercept cert download page requests
     const host = (clientReq.headers.host || "").split(":")[0];
-    if (host === CERT_DOWNLOAD_HOST) {
+    const targetUrl = clientReq.url || "";
+    const parsedTarget = url.parse(targetUrl);
+    const targetHost = (parsedTarget.hostname || "").split(":")[0];
+    if (isCertDownloadHost(host) || isCertDownloadHost(targetHost)) {
       this.serveCertPage(clientReq, clientRes);
       return;
     }
@@ -398,14 +401,13 @@ export class MitmProxyServer extends EventEmitter {
     const startTime = Date.now();
     const requestId = `proxy-${uuidv4()}`;
 
-    const targetUrl = clientReq.url;
     if (!targetUrl) {
       clientRes.writeHead(400);
       clientRes.end("Bad Request");
       return;
     }
 
-    const parsed = url.parse(targetUrl);
+    const parsed = parsedTarget;
     const reqBodyChunks: Buffer[] = [];
     let reqBodySize = 0;
 
@@ -979,7 +981,7 @@ export class MitmProxyServer extends EventEmitter {
 
   /**
    * Serve the certificate download page or the certificate file itself
-   * when a client accesses the magic hostname (cert.anything.local).
+   * when a client accesses the certificate hostnames.
    */
   private serveCertPage(
     req: http.IncomingMessage,
@@ -992,8 +994,8 @@ export class MitmProxyServer extends EventEmitter {
       try {
         const certContent = getCertFileContent(this.caManager);
         res.writeHead(200, {
-          "Content-Type": "application/x-x509-ca-cert",
-          "Content-Disposition": "attachment; filename=\"anything-analyzer-ca.crt\"",
+          "Content-Type": "application/pkix-cert",
+          "Content-Disposition": "attachment; filename=\"anything-analyzer-ca.cer\"",
           "Content-Length": certContent.length,
           "Cache-Control": "no-cache",
         });

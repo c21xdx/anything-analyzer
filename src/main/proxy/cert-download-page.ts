@@ -2,7 +2,13 @@ import { readFileSync } from "fs";
 import type { CaManager } from "./ca-manager";
 
 /** Magic hostname that triggers the cert download page */
-export const CERT_DOWNLOAD_HOST = "cert.anything.local";
+export const CERT_DOWNLOAD_HOST = "cert.anything.test";
+export const CERT_DOWNLOAD_FALLBACK_HOST = "cert.anything.local";
+
+export function isCertDownloadHost(host: string): boolean {
+  const normalized = host.trim().toLowerCase().replace(/\.$/, "");
+  return normalized === CERT_DOWNLOAD_HOST || normalized === CERT_DOWNLOAD_FALLBACK_HOST;
+}
 
 /**
  * Detect platform from User-Agent string.
@@ -18,6 +24,7 @@ function detectPlatform(ua: string): "ios" | "android" | "desktop" {
  */
 export function generateCertPage(ua: string): string {
   const platform = detectPlatform(ua);
+  const downloadHost = platform === "ios" ? CERT_DOWNLOAD_HOST : CERT_DOWNLOAD_FALLBACK_HOST;
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -59,12 +66,12 @@ h1{font-size:20px;text-align:center;margin-bottom:8px;color:#f8fafc}
   <p class="subtitle">Anything Analyzer 需要安装根证书以解密 HTTPS 流量</p>
   <div style="text-align:center"><span class="platform-tag" id="platformTag">${platform === "ios" ? "🍎 iOS" : platform === "android" ? "🤖 Android" : "💻 桌面端"}</span></div>
 
-  <a class="download-btn primary" href="http://${CERT_DOWNLOAD_HOST}/cert.crt" id="downloadBtn">⬇ 下载证书</a>
+  <a class="download-btn primary" href="http://${downloadHost}/cert.cer" id="downloadBtn">⬇ 下载证书</a>
 
   <div class="tabs">
-    <button class="tab${platform === "ios" ? " active" : ""}" onclick="showTab('ios')">iOS</button>
-    <button class="tab${platform === "android" ? " active" : ""}" onclick="showTab('android')">Android</button>
-    <button class="tab${platform === "desktop" ? " active" : ""}" onclick="showTab('desktop')">桌面端</button>
+    <button class="tab${platform === "ios" ? " active" : ""}" onclick="showTab('ios', this)">iOS</button>
+    <button class="tab${platform === "android" ? " active" : ""}" onclick="showTab('android', this)">Android</button>
+    <button class="tab${platform === "desktop" ? " active" : ""}" onclick="showTab('desktop', this)">桌面端</button>
   </div>
 
   <div id="tab-ios" class="tab-content${platform === "ios" ? " active" : ""}">
@@ -76,7 +83,7 @@ h1{font-size:20px;text-align:center;margin-bottom:8px;color:#f8fafc}
       <div class="step"><span class="step-num">4</span><span>前往「设置」→「通用」→「关于本机」→「证书信任设置」</span></div>
       <div class="step"><span class="step-num">5</span><span>开启「Anything Analyzer CA」的完全信任开关</span></div>
     </div>
-    <div class="note"><strong>⚠ 重要：</strong>iOS 需要同时完成「安装描述文件」和「启用信任」两个步骤，缺一不可。</div>
+    <div class="note"><strong>⚠ 重要：</strong>iOS 建议优先使用 <code>cert.anything.test</code> 下载。安装后还需在「证书信任设置」中手动启用完全信任。</div>
   </div>
 
   <div id="tab-android" class="tab-content${platform === "android" ? " active" : ""}">
@@ -99,11 +106,11 @@ h1{font-size:20px;text-align:center;margin-bottom:8px;color:#f8fafc}
   </div>
 </div>
 <script>
-function showTab(name){
+function showTab(name, el){
   document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(e=>e.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
-  event.target.classList.add('active');
+  if (el) el.classList.add('active');
 }
 </script>
 </body>
